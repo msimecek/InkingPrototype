@@ -19,7 +19,7 @@
         </Grid>
 
         <Grid Width="400" Height="400" Grid.Row="1">
-            <Image x:Name="destImage" />
+            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Height="Auto" />
         </Grid>
 
         <Button Content="share" Click="Share_Click" />

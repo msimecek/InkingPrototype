@@ -1,15 +1,14 @@
 ﻿using Microsoft.Graphics.Canvas;
 using System;
-using System.Diagnostics;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
-using Windows.Graphics.Display;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
-using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
@@ -24,9 +23,14 @@ namespace InkingPrototype
     /// </summary>
     public sealed partial class MainPage : Page
     {
+        VM viewModel;
+        RandomAccessStreamReference image;
+
         public MainPage()
         {
             this.InitializeComponent();
+            viewModel = new VM();
+            this.DataContext = viewModel;
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -41,24 +45,32 @@ namespace InkingPrototype
             DataTransferManager.GetForCurrentView().DataRequested -= MainPage_DataRequested;
         }
 
-        async private void MainPage_DataRequested(DataTransferManager sender, DataRequestedEventArgs args)
+        private void MainPage_DataRequested(DataTransferManager sender, DataRequestedEventArgs args)
         {
+            viewModel.Status = "DataRequested Start";
+            viewModel.Status += $"\nDeadline: {args.Request.Deadline.ToString()}";
+
             var deferral = args.Request.GetDeferral();
 
-            args.Request.Data.SetBitmap(await GetImage());
+            args.Request.Data.SetBitmap(image);
             args.Request.Data.Properties.Description = "Shared drwaing";
             args.Request.Data.Properties.Title = "Sdílíme ink";
 
             deferral.Complete();
+
+            viewModel.Status += "\nDataRequested End";
         }
 
-        private void Share_Click(object sender, RoutedEventArgs e)
+        async private void Share_Click(object sender, RoutedEventArgs e)
         {
+            image = await GetImage();
             DataTransferManager.ShowShareUI();
         }
 
         async public Task<RandomAccessStreamReference> GetImage()
         {
+            viewModel.Status += "\nGetImage Start";
+            
             // 1. Příprava
             CanvasDevice device = CanvasDevice.GetSharedDevice();
 
@@ -112,8 +124,39 @@ namespace InkingPrototype
                 await encoder.FlushAsync();
                 stream.Seek(0);
 
+                viewModel.Status += "\nGetImage End";
+
                 return RandomAccessStreamReference.CreateFromStream(stream);
             }
         }
+    }
+
+    public class VM : INotifyPropertyChanged
+    {
+        private string status;
+
+        public string Status
+        {
+            get { return status; }
+            set { Set<string>(ref status, value); }
+        }
+
+        #region INotifyPropertyChanged
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public void Set<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (!Equals(storage, value))
+            {
+                storage = value;
+                RaisePropertyChanged(propertyName);
+            }
+        }
+
+        public void RaisePropertyChanged([CallerMemberName] string propertyName = null) =>
+           PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        #endregion
     }
 }
