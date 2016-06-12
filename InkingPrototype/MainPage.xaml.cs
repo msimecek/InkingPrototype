@@ -50,27 +50,29 @@ namespace InkingPrototype
             viewModel.Status = "DataRequested Start";
             viewModel.Status += $"\nDeadline: {args.Request.Deadline.ToString()}";
 
-            var deferral = args.Request.GetDeferral();
-
-            args.Request.Data.SetBitmap(image);
             args.Request.Data.Properties.Description = "Shared drwaing";
             args.Request.Data.Properties.Title = "Sdílíme ink";
-
-            deferral.Complete();
+            args.Request.Data.SetDataProvider(StandardDataFormats.Bitmap, renderer);
 
             viewModel.Status += "\nDataRequested End";
         }
 
-        async private void Share_Click(object sender, RoutedEventArgs e)
+        private async void renderer(DataProviderRequest request)
         {
-            image = await GetImage();
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () => {
+                var deferral = request.GetDeferral();
+                request.SetData(await GetImage());
+                deferral.Complete();
+            });
+        }
+
+        private void Share_Click(object sender, RoutedEventArgs e)
+        {
             DataTransferManager.ShowShareUI();
         }
 
         async public Task<RandomAccessStreamReference> GetImage()
         {
-            viewModel.Status += "\nGetImage Start";
-            
             // 1. Příprava
             CanvasDevice device = CanvasDevice.GetSharedDevice();
 
@@ -123,8 +125,6 @@ namespace InkingPrototype
                 );
                 await encoder.FlushAsync();
                 stream.Seek(0);
-
-                viewModel.Status += "\nGetImage End";
 
                 return RandomAccessStreamReference.CreateFromStream(stream);
             }
